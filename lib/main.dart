@@ -12,7 +12,7 @@ import 'package:shop_app/screens/orders_screen.dart';
 import 'package:shop_app/screens/products_overview_screen.dart';
 
 import 'screens/product_details_screen.dart';
-import 'screens/splash-screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -81,7 +81,7 @@ class MyApp extends StatelessWidget {
                   ),
             ),
             home: auth.isAuth
-                ? const ProductsOverviewScreen()
+                ? ProductsOverviewScreen(isAuth: auth.isAuth)
                 : FutureBuilder(
                     future: auth.autoLogin(),
                     builder: (ctx, autologinSnapshot) {
@@ -89,12 +89,16 @@ class MyApp extends StatelessWidget {
                           ConnectionState.waiting) {
                         return const SplashScreen();
                       } else {
-                        return const AuthScreen();
+                        return ProductsOverviewScreen(
+                          isAuth: auth.isAuth,
+                        );
                       }
                     }),
             routes: {
               ProductsOverviewScreen.routeName: (context) =>
-                  const ProductsOverviewScreen(),
+                  ProductsOverviewScreen(
+                    isAuth: auth.isAuth,
+                  ),
               ProductDetailsScreen.routeName: (ctx) =>
                   const ProductDetailsScreen(),
               CartScreen.routeName: (context) => const CartScreen(),
@@ -103,6 +107,9 @@ class MyApp extends StatelessWidget {
                   const ManageProductScreen(),
               EditAddProductScreen.routeName: (context) =>
                   const EditAddProductScreen(),
+              AuthScreen.routeName: (context) => const AuthScreen(),
+              // ProductsSearchScreen.routeName: (context) =>
+              //     const ProductsSearchScreen(),
             },
           );
         },

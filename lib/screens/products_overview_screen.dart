@@ -6,6 +6,7 @@ import 'package:shop_app/screens/cart_screen.dart';
 import 'package:shop_app/widgets/app_drawer.dart';
 import 'package:shop_app/widgets/cart_badge.dart';
 
+import '../provider/auth.dart';
 import '../widgets/products_overview_gridview.dart';
 
 enum FilterGrid {
@@ -15,17 +16,28 @@ enum FilterGrid {
 
 class ProductsOverviewScreen extends StatefulWidget {
   static const routeName = '/products-overview';
-  const ProductsOverviewScreen({super.key});
+  final bool isAuth;
+  const ProductsOverviewScreen({super.key, required this.isAuth});
 
   @override
   State<ProductsOverviewScreen> createState() => _ProductsOverviewScreenState();
 }
 
 class _ProductsOverviewScreenState extends State<ProductsOverviewScreen> {
+  bool _showSearch = false;
   var _showFav = false;
   var _isInit = true;
   var _isLoading = false;
   var _isUnavailable = false;
+  bool isSearching = false;
+  final FocusNode _searchFocus = FocusNode();
+  String searchedData = "";
+
+  @override
+  void dispose() {
+    _searchFocus.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -34,7 +46,7 @@ class _ProductsOverviewScreenState extends State<ProductsOverviewScreen> {
         _isLoading = true;
       });
       Provider.of<ProductsProvider>(context)
-          .fetchAndSetProducts(true)
+          .fetchAndSetProducts()
           .catchError((error) {
         // showDialog<void>(
         //   context: context,
@@ -69,35 +81,72 @@ class _ProductsOverviewScreenState extends State<ProductsOverviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+   
+    var auth = Provider.of<Auth>(context);
+    var userId = auth.userId;
+    var token = auth.token;
     var cartItemCount = Provider.of<Cart>(context).itemCount;
+
+    final products = _showSearch
+        ? Provider.of<ProductsProvider>(context).searchItems
+        : _showFav
+            ? Provider.of<ProductsProvider>(context).favourites
+            : Provider.of<ProductsProvider>(context).items;
+
+    if (products.isEmpty) {
+      setState(() {
+        _isUnavailable = true;
+      });
+    } else {
+      setState(() {
+        _isUnavailable = false;
+      });
+    }
+
     return Scaffold(
       drawer: const AppDrawer(),
       appBar: AppBar(
-        title: const Text('Shop App'),
+        title: isSearching ? _buildSearchField() : const Text('Shop App'),
         actions: [
-          PopupMenuButton(
-            itemBuilder: (context) {
-              return [
-                const PopupMenuItem(
-                  value: FilterGrid.favourites,
-                  child: Text('Only Favourites'),
-                ),
-                const PopupMenuItem(
-                  value: FilterGrid.all,
-                  child: Text('All'),
-                ),
-              ];
-            },
-            onSelected: (FilterGrid value) {
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
               setState(() {
-                if (value == FilterGrid.favourites) {
-                  _showFav = true;
-                } else {
-                  _showFav = false;
-                }
+                isSearching = !isSearching;
+                _showSearch = false;
               });
+              if (isSearching) {
+                _searchFocus.requestFocus();
+              } else {
+                searchedData = "";
+                _searchFocus.unfocus();
+              }
             },
           ),
+          if (userId.isNotEmpty || token.isNotEmpty)
+            PopupMenuButton(
+              itemBuilder: (context) {
+                return [
+                  const PopupMenuItem(
+                    value: FilterGrid.favourites,
+                    child: Text('Only Favourites'),
+                  ),
+                  const PopupMenuItem(
+                    value: FilterGrid.all,
+                    child: Text('All'),
+                  ),
+                ];
+              },
+              onSelected: (FilterGrid value) {
+                setState(() {
+                  if (value == FilterGrid.favourites) {
+                    _showFav = true;
+                  } else {
+                    _showFav = false;
+                  }
+                });
+              },
+            ),
           Container(
             padding: const EdgeInsets.only(
               right: 8,
@@ -133,7 +182,51 @@ class _ProductsOverviewScreenState extends State<ProductsOverviewScreen> {
               ? const Center(
                   child: Text('No products available.'),
                 )
-              : BuildProductsOverviewGridview(_showFav)),
+              : BuildProductsOverviewGridview(products)),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return TextField(
+      focusNode: _searchFocus,
+      decoration: InputDecoration(
+        hintText: 'Search...',
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(10.0)),
+        ),
+        hintStyle: const TextStyle(color: Colors.white),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () {
+            setState(() {
+              isSearching = false;
+              _showSearch = false;
+            });
+          },
+        ),
+      ),
+      textInputAction: TextInputAction.search,
+      onSubmitted: (value) {
+        setState(() {
+          _isLoading = true;
+          _showSearch = true;
+        });
+        Provider.of<ProductsProvider>(context, listen: false)
+            .fetchAndSetProducts(false, value)
+            .catchError((error) {
+          _isUnavailable = true;
+        }).then(
+          (value) => setState(
+            () {
+              _isLoading = false;
+            },
+          ),
+        );
+      },
     );
   }
 }

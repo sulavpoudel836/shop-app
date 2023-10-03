@@ -8,48 +8,28 @@ import 'dart:convert';
 
 // ignore: must_be_immutable
 class ProductsProvider with ChangeNotifier {
-  List<Product> _items = [
-    // Product(
-    //   id: 'p1',
-    //   title: 'Red Shirt',
-    //   description: 'A red shirt - it is pretty red!',
-    //   price: 900,
-    //   imageUrl:
-    //       'https://cdn.pixabay.com/photo/2016/10/02/22/17/red-t-shirt-1710578_1280.jpg',
-    // ),
-    // Product(
-    //   id: 'p2',
-    //   title: 'Trousers',
-    //   description: 'A nice pair of trousers.',
-    //   price: 1000,
-    //   imageUrl:
-    //       'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Trousers%2C_dress_%28AM_1960.022-8%29.jpg/512px-Trousers%2C_dress_%28AM_1960.022-8%29.jpg',
-    // ),
-    // Product(
-    //   id: 'p3',
-    //   title: 'Yellow Scarf',
-    //   description: 'Warm and cozy - exactly what you need for the winter.',
-    //   price: 500,
-    //   imageUrl:
-    //       'https://live.staticflickr.com/4043/4438260868_cc79b3369d_z.jpg',
-    // ),
-    // Product(
-    //   id: 'p4',
-    //   title: 'A Pan',
-    //   description: 'Prepare any meal you want.',
-    //   price: 2000,
-    //   imageUrl:
-    //       'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Cast-Iron-Pan.jpg/1024px-Cast-Iron-Pan.jpg',
-    // ),
-  ];
+  List<Product> _items = [];
+  List<Product> _searchItems = [];
 
-  final String? authToken;
-  final String? userId;
+  bool isSearching = false;
+
+  void toggleSearch() {
+    isSearching = !isSearching;
+
+    notifyListeners();
+  }
+
+  String authToken = '';
+  String userId = '';
 
   ProductsProvider(this.authToken, this.userId, this._items);
 
   List<Product> get items {
     return [..._items];
+  }
+
+  List<Product> get searchItems {
+    return [..._searchItems];
   }
 
   List<Product> get favourites {
@@ -60,27 +40,98 @@ class ProductsProvider with ChangeNotifier {
     return items.firstWhere((element) => element.id == id);
   }
 
-  Future<void> fetchAndSetProducts([bool filterByUser = false]) async {
-    String filterString =
-        filterByUser ? 'orderBy="creatorId"&equalTo="$userId"' : '';
+  // Future<void> fetchAndSetProductsBySearch(String search) async {
+  //   print('here');
+  //   var url = Uri.parse(
+  //       'https://flutter-shop-app-2ab59-default-rtdb.firebaseio.com/products.json?orderBy="title"&equalTo="$search"');
+
+  //   try {
+  //     final response = await http.get(url);
+
+  //     final extractedData = json.decode(response.body) as Map<String, dynamic>;
+
+  //     if (extractedData.isEmpty) {
+  //       _items = [];
+  //       return;
+  //     }
+
+  //     url = Uri.parse(
+  //         'https://flutter-shop-app-2ab59-default-rtdb.firebaseio.com/user-favourites/$userId.json');
+
+  //     final favouriteResponse = await http.get(url);
+
+  //     final favouriteData = json.decode(favouriteResponse.body);
+  //     final List<Product> loadedProducts = [];
+  //     if (extractedData.isEmpty) {
+  //       _items = [];
+  //       return;
+  //     }
+
+  //     // var prefs = await SharedPreferences.getInstance();
+  //     // final productData = json.encode({
+  //     //   'products': extractedData,
+  //     //   'favourites': favouriteData,
+  //     // });
+  //     // prefs.setString('productData', productData);
+  //     // final localProductData =
+  //     //     json.decode(prefs.getString('productData')!) as Map<String, dynamic>;
+  //     // print(localProductData);
+
+  //     extractedData.forEach((productId, productData) {
+  //       loadedProducts.add(Product(
+  //         id: productId,
+  //         title: productData['title'],
+  //         description: productData['description'],
+  //         price: productData['price'],
+  //         imageUrl: productData['imageUrl'],
+  //         isFavourite:
+  //             favouriteData == null ? false : favouriteData[productId] ?? false,
+  //       ));
+  //     });
+  //     // print(loadedProducts);
+  //     _items = loadedProducts;
+
+  //     print(_items.length);
+  //     notifyListeners();
+  //   } catch (error) {
+  //     // print(error);
+  //     rethrow;
+  //   }
+  // }
+
+  Future<void> fetchAndSetProducts(
+      [bool filterByUser = false, String search = ""]) async {
+    String filterString = filterByUser
+        ? 'auth=$authToken&orderBy="creatorId"&equalTo="$userId"'
+        : '';
+
     var url = Uri.parse(
-        'https://flutter-shop-app-2ab59-default-rtdb.firebaseio.com/products.json?auth=$authToken&$filterString');
+        'https://flutter-shop-app-2ab59-default-rtdb.firebaseio.com/products.json?$filterString');
 
     try {
       final response = await http.get(url);
+
       final extractedData = json.decode(response.body) as Map<String, dynamic>;
+
+      // final List<dynamic> allProducts = extractedData.values.toList();
+
       if (extractedData.isEmpty) {
+        _items = [];
+        _searchItems = [];
         return;
       }
 
       url = Uri.parse(
-          'https://flutter-shop-app-2ab59-default-rtdb.firebaseio.com/user-favourites/$userId.json?auth=$authToken');
+          'https://flutter-shop-app-2ab59-default-rtdb.firebaseio.com/user-favourites/$userId.json');
 
       final favouriteResponse = await http.get(url);
 
       final favouriteData = json.decode(favouriteResponse.body);
       final List<Product> loadedProducts = [];
+      final List<Product> loadedSearchProducts = [];
       if (extractedData.isEmpty) {
+        _items = [];
+        _searchItems = [];
         return;
       }
 
@@ -105,8 +156,33 @@ class ProductsProvider with ChangeNotifier {
               favouriteData == null ? false : favouriteData[productId] ?? false,
         ));
       });
+
+      final searchedData = {};
+      extractedData.forEach((productId, productData) {
+        if (productData['title']
+            .toString()
+            .toLowerCase()
+            .contains(search.toLowerCase())) {
+          searchedData[productId] = productData;
+        }
+      });
+
+      searchedData.forEach((productId, productData) {
+        loadedSearchProducts.add(Product(
+          id: productId,
+          title: productData['title'],
+          description: productData['description'],
+          price: productData['price'],
+          imageUrl: productData['imageUrl'],
+          isFavourite:
+              favouriteData == null ? false : favouriteData[productId] ?? false,
+        ));
+      });
+
       // print(loadedProducts);
       _items = loadedProducts;
+      _searchItems = loadedSearchProducts;
+
       notifyListeners();
     } catch (error) {
       // print(error);
@@ -139,7 +215,7 @@ class ProductsProvider with ChangeNotifier {
         price: newProduct.price,
         imageUrl: newProduct.imageUrl,
       );
-      
+
       _items.add(addThis);
       notifyListeners();
     } catch (error) {

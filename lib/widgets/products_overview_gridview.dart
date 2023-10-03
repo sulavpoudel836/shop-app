@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shop_app/provider/products_provider.dart';
 import 'package:shop_app/widgets/product_item.dart';
 
+import '../provider/product.dart';
+
 class BuildProductsOverviewGridview extends StatelessWidget {
-  final bool showFav;
+  final List<Product> products;
   const BuildProductsOverviewGridview(
-    this.showFav, {
+    this.products, {
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
-    final products = showFav
-        ? Provider.of<ProductsProvider>(context).favourites
-        : Provider.of<ProductsProvider>(context).items;
+    // final products = showSearch
+    //     ? Provider.of<ProductsProvider>(context).searchItems
+    //     : showFav
+    //         ? Provider.of<ProductsProvider>(context).favourites
+    //         : Provider.of<ProductsProvider>(context).items;
     return GridView.builder(
       // GridView.builder is a better choice than GridView.count
       padding: const EdgeInsets.all(10),
